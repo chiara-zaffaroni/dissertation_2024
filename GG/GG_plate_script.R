@@ -1,5 +1,3 @@
-# 1. PREP
-# load in packages
 library(readxl)
 library(dplyr)
 library(janitor)
@@ -11,6 +9,7 @@ library(tseries)
 library(tibble)
 library(writexl)
 library(stringr)
+library(forcats)
 library(ggsignif)
 
 GG_plate_A1_original <- read_excel("hMglia GG A1 HighValue4 Widerange 10 threshold.txt.xlsx", sheet = 1, skip = 6) %>% 
@@ -158,7 +157,7 @@ calculate_z_prime <- function(positive_median, positive_sd, negative_median, neg
 }
 
 # Calculate Z' prime for both combinations (with edges)
-z_prime_results_GGL_A1 <- grouped_data_GG_A1 %>%
+z_prime_results_GG_A1 <- grouped_data_GG_A1 %>%
   reframe(
     Z_Prime_LPS_TAK3uM = calculate_z_prime(
       Median[Treatment == "LPS.dmso"],
@@ -177,7 +176,7 @@ z_prime_results_GGL_A1 <- grouped_data_GG_A1 %>%
   tab_header(title = "Plate GG A1 (with edges)")
 
 
-
+# testing 124
 # edgeless plate
 GG_plate_A1_edgeless <- GG_plate_A1 %>% 
   filter(!column %in% c("1", "2", "23", "24")) %>% 
