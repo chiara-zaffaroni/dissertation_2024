@@ -11,6 +11,7 @@ library(writexl)
 library(stringr)
 library(forcats)
 library(ggsignif)
+library(emmeans)
 
 LL_plate_A1_original <- read_excel("hMglia LL A1 BariTacro Round4 15.3.24.xlsx", sheet = 1, skip = 8) %>% 
   clean_names() %>% 
@@ -114,24 +115,47 @@ LL_A1_CV_analysis <- LL_plate_A1_max %>%
 
 # Z data prep (with edges)
 LL_A1_Z_data <- LL_plate_A1 %>% 
-  filter(Compound %in% c("dmso", "TAK3mM")) %>% 
+  filter(Compound %in% c("dmso", "TAK3uM")) %>% 
   mutate(Treatment = interaction(LPS_status, Compound)) %>% 
   dplyr::select(Treatment,cell_area_1k_rod_h_mglia_dapi_cy5_23) %>% 
   pivot_longer(cols = c(cell_area_1k_rod_h_mglia_dapi_cy5_23), names_to = "Threshold", values_to = "Value") %>% 
   group_by(Threshold, Treatment) %>%
-  filter(!Treatment %in% "noLPS.dmso") %>% 
+  # filter(!Treatment %in% "noLPS.dmso") %>% 
   summarise(Median = median(Value),
             SD = sd(Value)) 
 
+# Compute counts (n) for each treatment
+sample_counts <- LL_A1_Z_data %>%
+  group_by(Treatment) %>%
+  summarise(n = n())
+
 # Plot (with edges)
 LL_A1_Z_plot <- LL_A1_Z_data %>% 
+  mutate(Treatment = factor(Treatment, levels = c("noLPS.dmso", "LPS.dmso", "LPS.TAK3uM"))) %>%
   ggplot(aes(x=Treatment, y=Value, colour = Treatment)) +
-  geom_boxplot() +
+  geom_boxplot(colour = c("#00bb38", "#f88a82", "#72a5ff")) +
   theme_minimal() +
   geom_jitter(position = position_jitter(width = 0.2), size = 1, alpha = 0.5) +
-  facet_grid(~ Threshold, labeller = labeller(Threshold = c("cell_area_1k_rod_h_mglia_dapi_cy5_23" = "1k Threshold", "cell_area_2k_rod_h_mglia_dapi_cy5_26" = "2k Threshold", "cell_area_3_5k_rod_h_mglia_dapi_cy5_30" = "3k Threshold", "cell_area_5k_rod_h_mglia_dapi_cy5_33" = "5k Threshold", "cell_area_7_5k_rod_h_mglia_dapi_cy5_37" = "7.5k Threshold", "cell_area10k_rod_h_mglia_dapi_cy5_41" = "10k Threshold"))) +
-  theme(legend.position = "none", strip.text = element_text(size = 12, face = "bold"), axis.title=element_text(size=13), axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(title ="Plate LL A1 (with edges)", y = "CD38 Area/nuclei") 
+  scale_color_manual(values = c(noLPS.dmso='#00bb38',LPS.dmso='#f88a82',LPS.TAK3uM='#72a5ff')) +
+  theme(legend.position = "none", strip.text = element_text(size = 12, face = "bold"), axis.title=element_text(size=13), legend.text = element_text(size = 12), legend.title = element_text(size = 14)) +
+  labs(title ="Plate LL A1 (with edges)", y = "CD38 Area/nuclei") +
+  theme(axis.text.x = element_text(size = 16),
+        axis.text.y = element_text(size = 16),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20)) +
+  coord_cartesian(ylim = c(0, 3500)) 
+
+comparisons_list <- list(c("noLPS.dmso", "LPS.dmso"), c("LPS.dmso", "LPS.TAK3uM"), c("noLPS.dmso", "LPS.TAK3uM"))
+LL_A1_Z_plot + geom_signif(comparisons = comparisons_list, map_signif_level = TRUE, step_increase = 0.1, colour = "black") + geom_text(data = sample_counts, aes(label = paste("n =", n), x = Treatment, y = -Inf), vjust = 0, size = 4, hjust = 0.5, angle = 0, inherit.aes = FALSE)
+
+GLM <- lm(Value ~ factor(Treatment), data = LL_A1_Z_data)
+plot(GLM) # ASSUMPTIONS MET
+summary(GLM)
+anova(GLM) #F-statistic: 548.2 on 6 and 849 DF,  p-value: < 2.2e-16 --> STRONG EVIDENCE FOR AN EFFECT OF BATCH ON VALUE AKA BATCH-TO-BATCH VARIATION
+MEANS <- emmeans(GLM, "Treatment")
+PAIRS <- pairs(MEANS)
+CI <- confint(PAIRS)
+
 
 # Group data by Threshold
 grouped_data_LL_A1 <- LL_A1_Z_data %>%
@@ -245,8 +269,8 @@ z_prime_results_LL_A1_edgeless <- grouped_data_LL_A1_edgeless %>%
 LL_A1_Z_data_Bari <- LL_plate_A1_edgeless %>% 
   filter(Compound %in% c("dmso", "TAK3mM", "Bari 3", "Bari 1", "Bari 0.3")) %>% 
   mutate(Treatment = interaction(LPS_status, Compound)) %>% 
-  dplyr::select(Treatment,cell_area_1k_rod_h_mglia_dapi_cy5_23) %>% 
-  pivot_longer(cols = cell_area_1k_rod_h_mglia_dapi_cy5_23, names_to = "Threshold", values_to = "Value") 
+  dplyr::select(Treatment,x2k_nuc) %>% 
+  pivot_longer(cols = x2k_nuc, names_to = "Threshold", values_to = "Value") 
 
 # Bari Plot
 LL_A1_Z_Bari_plot <- LL_A1_Z_data_Bari %>% 
